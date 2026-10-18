@@ -1,0 +1,23 @@
+# 密钥与敏感配置
+.env
+
+# 运行时生成的目录
+uploads/*
+!uploads/.gitkeep
+logs/
+
+# Python 缓存与虚拟环境
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 本地二进制工具（体积大，不提交仓库，按需重新下载）
+scripts/cloudflared.exe
+
+# IDE / 系统文件
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

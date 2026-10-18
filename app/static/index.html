@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhenoAge 生理年龄测算</title>
+  <meta name="description" content="上传血检报告照片，测算你的生理年龄（PhenoAge）。结果仅供健康参考，不构成医疗诊断。" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>PhenoAge 生理年龄测算</h1>
+    <p class="subtitle">上传血检报告照片，AI 自动提取指标并计算你的生理年龄</p>
+  </header>
+
+  <!-- 免责声明常驻展示：任何页面状态下都可见（验收标准第 5 条） -->
+  <div class="disclaimer-banner" id="disclaimer-banner">
+    本结果由公开公式计算，仅供健康参考，不构成医疗诊断或医疗建议；如有不适请就医。
+  </div>
+
+  <main class="container">
+    <!-- 状态 1：上传照片 -->
+    <section class="card" id="step-upload">
+      <h2>上传血检报告照片</h2>
+      <p class="hint">支持 jpg / png / webp，单张不超过 10 MB。建议同时包含血常规与生化部分。</p>
+
+      <div class="drop-zone" id="drop-zone" tabindex="0">
+        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden />
+        <div class="drop-zone-inner">
+          <div class="drop-icon">📄</div>
+          <p id="drop-text">点击选择照片，或将照片拖到这里</p>
+          <button type="button" class="btn btn-primary" id="btn-choose">选择照片</button>
+        </div>
+        <img id="preview" class="preview" alt="照片预览" hidden />
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="btn-extract" disabled>上传并识别</button>
+        <button type="button" class="btn btn-ghost" id="btn-skip">跳过上传，手动录入</button>
+      </div>
+      <p class="error-text" id="upload-error" hidden></p>
+    </section>
+
+    <!-- 状态：识别中 -->
+    <section class="card" id="step-extracting" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>正在识别报告…</h2>
+      <p class="hint">AI 正在读取照片中的 10 项指标，通常需要几秒到几十秒，请稍候。</p>
+    </section>
+
+    <!-- 状态 2：核对 / 补填表单 -->
+    <section class="card" id="step-form" hidden>
+      <h2>核对并补填指标</h2>
+      <p class="hint">AI 已识别的项已自动填入，请核对；标注「需手动填写」的项请根据报告补充。年龄不在报告上，必须手动填写。</p>
+      <form id="calc-form" novalidate>
+        <div class="field-grid" id="field-grid"></div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary" id="btn-calculate">开始计算</button>
+          <button type="button" class="btn btn-ghost" id="btn-reupload">重新上传照片</button>
+        </div>
+      </form>
+      <p class="error-text" id="form-error" hidden></p>
+    </section>
+
+    <!-- 状态 3：结果卡片 -->
+    <section class="card" id="step-result" hidden>
+      <h2>测算结果</h2>
+      <div class="result-card" id="result-card">
+        <div class="result-hero">
+          <div class="result-main">
+            <span class="result-label">生理年龄 PhenoAge</span>
+            <span class="result-value" id="r-pheno-age">--</span>
+            <span class="result-unit">岁</span>
+          </div>
+          <span class="badge" id="r-tier">--</span>
+        </div>
+        <dl class="result-list">
+          <div><dt>实际年龄</dt><dd id="r-age">--</dd></div>
+          <div><dt>差值</dt><dd id="r-gap">--</dd></div>
+          <div><dt>10 年死亡风险</dt><dd id="r-mortality">--</dd></div>
+        </dl>
+        <p class="result-interpretation" id="r-interpretation"></p>
+        <p class="result-disclaimer" id="r-disclaimer"></p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="btn-save-image">保存结果卡片图片</button>
+        <button type="button" class="btn btn-ghost" id="btn-restart">重新测算</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>公式来源：Levine ME, et al. <em>Aging</em> 2018;10(4):573-591。</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
