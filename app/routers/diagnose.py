@@ -40,13 +40,22 @@ router = APIRouter(prefix="/api")
 settings = get_settings()
 vision_client = VisionClient(settings)
 
-_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
+_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+_ALLOWED_MIME = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+}
+MAX_IMAGES = 10
 _EXT_TO_MIME = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
 }
 
 
@@ -101,18 +110,31 @@ def _cleanup_old_uploads(now: Optional[float] = None) -> None:
 
 
 async def _extract_markers(
-    file: UploadFile,
+    files: list[UploadFile],
 ) -> tuple[dict[str, Optional[MarkerExtraction]], list[str], str]:
-    """提取 + 校验 + 落盘 + 归一化，供 /api/extract 与 /api/diagnose 复用。"""
-    content = await _read_limited(file, settings.max_upload_bytes)
-    ext = _validate_upload(file.filename, file.content_type, len(content))
-    mime = file.content_type or _EXT_TO_MIME[ext]
-    image_id = uuid.uuid4().hex
-    _save_upload(content, ext, image_id)
+    """提取 + 校验 + 落盘 + 归一化，供 /api/extract 与 /api/diagnose 复用。
+
+    支持一次上传多张照片（血常规 + 生化通常分属不同页），逐张识别后在后端合并。
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="请至少上传一张照片。")
+    if len(files) > MAX_IMAGES:
+        raise HTTPException(
+            status_code=400, detail=f"一次最多上传 {MAX_IMAGES} 张照片。"
+        )
+
+    base_id = uuid.uuid4().hex
+    images: list[tuple[bytes, str]] = []
+    for idx, file in enumerate(files):
+        content = await _read_limited(file, settings.max_upload_bytes)
+        ext = _validate_upload(file.filename, file.content_type, len(content))
+        mime = file.content_type or _EXT_TO_MIME[ext]
+        _save_upload(content, ext, f"{base_id}_{idx}")
+        images.append((content, mime))
     _cleanup_old_uploads()
 
     try:
-        raw = await vision_client.extract(content, mime)
+        raw = await vision_client.extract(images)
     except VisionServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -139,7 +161,7 @@ async def _extract_markers(
             censored=item.get("censored", False),
         )
 
-    return extracted, missing, image_id
+    return extracted, missing, base_id
 
 
 def _build_result(markers: dict[str, float]) -> CalculateResult:
@@ -159,9 +181,9 @@ def _build_result(markers: dict[str, float]) -> CalculateResult:
 
 
 @router.post("/extract", response_model=ExtractResponse)
-async def extract(file: UploadFile = File(...)) -> ExtractResponse:
-    """上传血检报告照片，返回结构化提取结果（值已归一化到标准单位）。"""
-    extracted, missing, image_id = await _extract_markers(file)
+async def extract(files: list[UploadFile] = File(...)) -> ExtractResponse:
+    """上传一张或多张血检报告照片，返回合并后的结构化提取结果。"""
+    extracted, missing, image_id = await _extract_markers(files)
     return ExtractResponse(extracted=extracted, missing=missing, image_id=image_id)
 
 
@@ -174,7 +196,7 @@ async def calculate_endpoint(req: CalculateRequest) -> CalculateResult:
 
 @router.post("/diagnose", response_model=DiagnoseResponse)
 async def diagnose(
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     age: Optional[float] = Form(default=None),
 ) -> DiagnoseResponse:
     """一步到位：上传照片并（若用户补充年龄后指标齐全）直接给出结果。
@@ -182,7 +204,7 @@ async def diagnose(
     注意：年龄通常不在报告上，所以本接口额外接收 age 表单字段；
     其他缺失指标仍需用户在前端补填后走 /api/calculate。
     """
-    extracted, missing, image_id = await _extract_markers(file)
+    extracted, missing, image_id = await _extract_markers(files)
 
     markers: dict[str, float] = {}
     for field in MARKER_FIELDS:

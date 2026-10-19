@@ -7,6 +7,7 @@ os.environ.setdefault("AI_API_KEY", "test-dummy-key")
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.vision import VisionClient
 
 client = TestClient(app)
 
@@ -61,7 +62,7 @@ def test_calculate_out_of_range_returns_chinese_422():
 def test_extract_rejects_bad_extension():
     resp = client.post(
         "/api/extract",
-        files={"file": ("evil.txt", b"hello", "text/plain")},
+        files=[("files", ("evil.txt", b"hello", "text/plain"))],
     )
     assert resp.status_code == 400
 
@@ -70,6 +71,30 @@ def test_extract_rejects_oversize():
     big = b"x" * (11 * 1024 * 1024)
     resp = client.post(
         "/api/extract",
-        files={"file": ("big.png", big, "image/png")},
+        files=[("files", ("big.png", big, "image/png"))],
     )
     assert resp.status_code == 413
+
+
+def test_vision_merge_prefers_higher_confidence():
+    """多张照片的同一字段取置信度更高的一项。"""
+    merged = VisionClient._merge(
+        [
+            {"albumin": {"value": 46.2, "unit": "g/L", "confidence": 0.5}},
+            {"albumin": {"value": 4.6, "unit": "g/dL", "confidence": 0.9}},
+            {"creatinine": {"value": 79, "unit": "μmol/L", "confidence": 0.7}},
+        ]
+    )
+    assert merged["albumin"]["value"] == 4.6
+    assert merged["creatinine"]["value"] == 79
+
+
+def test_vision_merge_prefers_confident_value_over_missing_confidence():
+    """有置信度的候选优先于缺失置信度的候选。"""
+    merged = VisionClient._merge(
+        [
+            {"wbc": {"value": 6.0, "unit": "10^9/L"}},
+            {"wbc": {"value": 6.2, "unit": "10^9/L", "confidence": 0.8}},
+        ]
+    )
+    assert merged["wbc"]["value"] == 6.2

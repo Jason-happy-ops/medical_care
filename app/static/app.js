@@ -26,7 +26,8 @@ const steps = {
   result: $("step-result"),
 };
 
-let selectedFile = null;
+const MAX_IMAGES = 10;
+let selectedFiles = [];
 
 /* ---------- 页面状态切换 ---------- */
 function showStep(name) {
@@ -120,29 +121,88 @@ function collectForm() {
 }
 
 /* ---------- 上传与识别 ---------- */
-function handleFile(file) {
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
+const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+
+function isAllowedImage(file) {
+  if (ALLOWED_TYPES.includes(file.type)) return true;
+  // 部分手机浏览器 / WebView 上传时 file.type 为空，按扩展名兜底
+  const dot = file.name.lastIndexOf(".");
+  const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : "";
+  return ALLOWED_EXTS.includes(ext);
+}
+
+function handleFiles(fileList) {
   $("upload-error").hidden = true;
-  if (!file) return;
+  const incoming = Array.from(fileList || []).filter(Boolean);
+  if (!incoming.length) return;
 
-  const allowed = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowed.includes(file.type)) {
-    showError("仅支持 jpg / png / webp 格式的图片。");
-    return;
+  const valid = [];
+  for (const file of incoming) {
+    if (!isAllowedImage(file)) {
+      showError(`「${file.name}」格式不支持，仅支持 jpg / png / webp / heic。`);
+      continue;
+    }
+    if (file.size > MAX_BYTES) {
+      showError(`「${file.name}」超过 10 MB。`);
+      continue;
+    }
+    if (selectedFiles.length + valid.length >= MAX_IMAGES) {
+      showError(`一次最多上传 ${MAX_IMAGES} 张照片。`);
+      break;
+    }
+    valid.push(file);
   }
-  if (file.size > MAX_BYTES) {
-    showError("图片大小不能超过 10 MB。");
-    return;
-  }
+  selectedFiles = selectedFiles.concat(valid);
+  renderPreviews();
+  $("btn-extract").disabled = selectedFiles.length === 0;
+  $("drop-text").textContent = selectedFiles.length
+    ? `已选择 ${selectedFiles.length} 张照片，可继续添加或直接识别`
+    : "点击选择照片（可多选），或将照片拖到这里";
+}
 
-  selectedFile = file;
-  $("btn-extract").disabled = false;
-  $("drop-text").textContent = file.name;
+function renderPreviews() {
+  const list = $("preview-list");
+  list.innerHTML = "";
+  selectedFiles.forEach((file, idx) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
 
-  if (file.type.startsWith("image/")) {
-    const preview = $("preview");
-    preview.src = URL.createObjectURL(file);
-    preview.hidden = false;
-  }
+    const img = document.createElement("img");
+    img.className = "preview-thumb";
+    img.src = URL.createObjectURL(file);
+    img.alt = `第 ${idx + 1} 张照片预览`;
+    img.addEventListener("error", () => {
+      // HEIC 等在部分浏览器无法解码预览，用文件名占位，不影响上传
+      const fallback = document.createElement("div");
+      fallback.className = "preview-fallback";
+      fallback.textContent = file.name;
+      img.replaceWith(fallback);
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "preview-remove";
+    remove.textContent = "移除";
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectedFiles.splice(idx, 1);
+      renderPreviews();
+      $("btn-extract").disabled = selectedFiles.length === 0;
+      $("drop-text").textContent = selectedFiles.length
+        ? `已选择 ${selectedFiles.length} 张照片，可继续添加或直接识别`
+        : "点击选择照片（可多选），或将照片拖到这里";
+    });
+
+    item.append(img, remove);
+    list.appendChild(item);
+  });
 }
 
 function showError(msg) {
@@ -151,12 +211,45 @@ function showError(msg) {
   el.hidden = false;
 }
 
+async function compressImage(file) {
+  // 浏览器无法解码 HEIC 时直接上传，交给后端转码
+  if (file.type === "image/heic" || file.type === "image/heif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxEdge = 2400;
+    if (Math.max(bitmap.width, bitmap.height) <= maxEdge) {
+      bitmap.close();
+      return file;
+    }
+    const ratio = maxEdge / Math.max(bitmap.width, bitmap.height);
+    const width = Math.max(1, Math.round(bitmap.width * ratio));
+    const height = Math.max(1, Math.round(bitmap.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.88)
+    );
+    if (!blob || blob.size >= file.size) return file;
+    const base = file.name.replace(/\.(jpe?g|png|webp)$/i, "");
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  } catch (err) {
+    return file;
+  }
+}
+
 async function extract() {
-  if (!selectedFile) return;
+  if (!selectedFiles.length) return;
   showStep("extracting");
 
+  const files = await Promise.all(selectedFiles.map((f) => compressImage(f)));
   const formData = new FormData();
-  formData.append("file", selectedFile);
+  files.forEach((file) => formData.append("files", file));
 
   let data;
   try {
@@ -315,13 +408,13 @@ function wrapText(ctx, text, maxWidth) {
 /* ---------- 事件绑定 ---------- */
 $("btn-choose").addEventListener("click", () => $("file-input").click());
 $("drop-zone").addEventListener("click", (e) => {
-  if (e.target === $("btn-choose")) return;
+  if (e.target.closest("#preview-list") || e.target.closest("button")) return;
   $("file-input").click();
 });
 $("drop-zone").addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") $("file-input").click();
 });
-$("file-input").addEventListener("change", (e) => handleFile(e.target.files[0]));
+$("file-input").addEventListener("change", (e) => handleFiles(e.target.files));
 
 ["dragenter", "dragover"].forEach((type) =>
   $("drop-zone").addEventListener(type, (e) => {
@@ -335,7 +428,7 @@ $("file-input").addEventListener("change", (e) => handleFile(e.target.files[0]))
     $("drop-zone").classList.remove("dragover");
   })
 );
-$("drop-zone").addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+$("drop-zone").addEventListener("drop", (e) => handleFiles(e.dataTransfer.files));
 
 $("btn-extract").addEventListener("click", extract);
 $("btn-skip").addEventListener("click", () => {
@@ -345,10 +438,10 @@ $("btn-skip").addEventListener("click", () => {
 });
 $("btn-reupload").addEventListener("click", () => showStep("upload"));
 $("btn-restart").addEventListener("click", () => {
-  selectedFile = null;
+  selectedFiles = [];
   $("file-input").value = "";
-  $("preview").hidden = true;
-  $("drop-text").textContent = "点击选择照片，或将照片拖到这里";
+  $("preview-list").innerHTML = "";
+  $("drop-text").textContent = "点击选择照片（可多选），或将照片拖到这里";
   $("btn-extract").disabled = true;
   showStep("upload");
 });

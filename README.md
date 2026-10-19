@@ -11,7 +11,8 @@ Cloudflare Tunnel 暴露到公网，自动获得 HTTPS。
 
 ## 功能特性
 
-- 照片识别：调用 OpenAI 兼容的多模态视觉模型，从血检报告照片中提取指标。
+- 照片识别：支持一次上传多张报告照片（如血常规 + 生化），调用 OpenAI 兼容的
+  多模态视觉模型逐张识别后按置信度合并结果。
 - Provider 可切换：默认 Moonshot Kimi，修改 `.env` 即可替换为其他兼容服务。
 - 单位归一化：后端统一把报告原始单位换算到公式要求的标准单位，避免因单位
   错误导致结果失真。
@@ -58,7 +59,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 浏览器打开 <http://127.0.0.1:8000> 即可使用。健康检查地址为
 <http://127.0.0.1:8000/healthz>。
 
-Windows 下也可以双击 `scripts/start.bat` 启动。
+Windows 下双击 `scripts/start_all.bat` 即可一键启动后端与 Cloudflare 隧道。
 
 ## 配置
 
@@ -68,7 +69,7 @@ Windows 下也可以双击 `scripts/start.bat` 启动。
 | --- | --- | --- |
 | `AI_API_KEY` | - | 必填，视觉模型的 API Key |
 | `AI_BASE_URL` | `https://api.moonshot.cn/v1` | OpenAI 兼容接口地址 |
-| `AI_MODEL` | `moonshot-v1-8k-vision-preview` | 模型名 |
+| `AI_MODEL` | `kimi-k3` | 视觉识别模型（如遇问题可回退 `kimi-k2.6`） |
 | `AI_TIMEOUT_SECONDS` | `60` | 单次识别超时（秒） |
 | `MAX_UPLOAD_BYTES` | `10485760` | 上传大小上限（10 MB） |
 | `UPLOAD_RETENTION_HOURS` | `24` | 上传照片保留时长 |
@@ -76,7 +77,8 @@ Windows 下也可以双击 `scripts/start.bat` 启动。
 
 ## 使用流程
 
-1. 上传血检报告照片（jpg / png / webp，不超过 10 MB），或跳过上传手动录入。
+1. 上传一张或多张血检报告照片（jpg / png / webp，单张不超过 10 MB），
+   或跳过上传手动录入。
 2. 后端调用视觉模型提取 10 项指标，并返回原始单位与置信度。
 3. 在表单中核对、补填指标（年龄通常不在报告上，需要手动填写）。
 4. 点击「开始计算」，查看结果卡片。
@@ -166,8 +168,9 @@ age_gap = PhenoAge - age
 │       ├── style.css
 │       └── app.js
 ├── scripts/
-│   ├── start.bat           # 启动后端
-│   └── start_tunnel.bat    # 启动 Cloudflare 隧道
+│   ├── start_all.bat       # 一键启动后端 + Cloudflare 隧道
+│   ├── cloudflared.exe     # 隧道客户端（本地二进制，不入库）
+│   └── smoke_vision.py     # 视觉识别端到端冒烟测试
 ├── tests/
 │   ├── test_phenoage.py
 │   └── test_api.py

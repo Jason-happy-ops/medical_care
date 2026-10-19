@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # ---- 视觉 AI 配置（默认 Moonshot Kimi，可切换任意 OpenAI 兼容服务）----
     ai_api_key: str = ""
     ai_base_url: str = "https://api.moonshot.cn/v1"
-    ai_model: str = "moonshot-v1-8k-vision-preview"
+    ai_model: str = "kimi-k3"
     ai_timeout_seconds: float = 60.0
 
     # ---- 上传限制与隐私 ----

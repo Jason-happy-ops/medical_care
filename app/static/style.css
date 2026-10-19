@@ -93,12 +93,59 @@ body {
 .drop-icon { font-size: 40px; }
 .drop-zone p { margin: 8px 0 12px; color: var(--muted); }
 
-.preview {
-  max-width: 100%;
-  max-height: 280px;
-  border-radius: 10px;
+.preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
   margin-top: 16px;
+}
+
+.preview-item { position: relative; }
+
+.preview-thumb {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
   border: 1px solid var(--border);
+}
+
+.preview-fallback {
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f5f5f5;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.tip {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  margin: 12px 0 0;
 }
 
 .actions {

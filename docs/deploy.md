@@ -25,25 +25,24 @@ copy .env.example .env
 AI_API_KEY=sk-你的真实Key
 ```
 
-然后启动后端：
+然后一键启动后端和隧道：
 
 ```bat
-scripts\start.bat
+scripts\start_all.bat
 ```
 
-看到 “Uvicorn running on http://127.0.0.1:8000” 后，浏览器打开
-`http://127.0.0.1:8000` 应能走完整流程。健康检查：
-`http://127.0.0.1:8000/healthz`。
+稍候几秒，浏览器打开 `http://127.0.0.1:8000` 应能走完整流程。健康检查：
+`http://127.0.0.1:8000/healthz`。后端日志见 `logs\backend.log`。
 
 ## 2. 用 cloudflared 获得临时公网链接（免费、免注册、免域名）
 
 1. 下载 Windows 版 `cloudflared.exe`：
    <https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/>
 2. 把 `cloudflared.exe` 放到 `scripts\` 目录（或加入 PATH）。
-3. 保持 `start.bat` 运行，另开一个 CMD 运行：
+3. 保持后端运行，另开一个 CMD 运行：
 
    ```bat
-   scripts\start_tunnel.bat
+   scripts\cloudflared.exe tunnel --url http://127.0.0.1:8000
    ```
 
 4. 终端会打印一个 `https://xxxx.trycloudflare.com` 地址，用手机（关闭 WiFi、
@@ -104,8 +103,7 @@ scripts\start.bat
 
 1. 打开 “任务计划程序” → 创建基本任务。
 2. 触发器选 “当前用户登录时”。
-3. 操作选 “启动程序”，分别指向 `scripts\start.bat` 和 `scripts\start_tunnel.bat`
-   （各建一个任务，启动目录填脚本所在目录）。
+3. 操作选 “启动程序”，指向 `scripts\start_all.bat`（启动目录填脚本所在目录）。
 4. 勾选 “使用最高权限运行” 视需要而定，一般不必。
 
 也可以把 cloudflared 注册为 Windows 服务，见 Cloudflare 官方文档

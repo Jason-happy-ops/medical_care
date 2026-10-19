@@ -22,17 +22,18 @@
     <!-- 状态 1：上传照片 -->
     <section class="card" id="step-upload">
       <h2>上传血检报告照片</h2>
-      <p class="hint">支持 jpg / png / webp，单张不超过 10 MB。建议同时包含血常规与生化部分。</p>
+      <p class="hint">支持 jpg / png / webp / heic，单张不超过 10 MB，可一次选择多张。建议把「血常规」和「生化」分别拍照上传。</p>
 
       <div class="drop-zone" id="drop-zone" tabindex="0">
-        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden />
+        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden />
         <div class="drop-zone-inner">
           <div class="drop-icon">📄</div>
-          <p id="drop-text">点击选择照片，或将照片拖到这里</p>
+          <p id="drop-text">点击选择照片（可多选），或将照片拖到这里</p>
           <button type="button" class="btn btn-primary" id="btn-choose">选择照片</button>
         </div>
-        <img id="preview" class="preview" alt="照片预览" hidden />
+        <div id="preview-list" class="preview-list"></div>
       </div>
+      <p class="tip">拍摄建议：光线充足、避免反光和阴影，对焦清晰，把整张化验单拍完整。</p>
 
       <div class="actions">
         <button type="button" class="btn btn-primary" id="btn-extract" disabled>上传并识别</button>
